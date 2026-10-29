@@ -1,0 +1,23 @@
+{
+  "name": "slidesync-local",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline LAN presentation sync for phone browsers",
+  "engines": { "node": ">=22.13.0" },
+  "scripts": {
+    "start": "node src/cli.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "playwright test",
+    "demo": "node scripts/create-demo.mjs"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "1.0.13",
+    "express": "5.3.0",
+    "multer": "2.5.0",
+    "pdfjs-dist": "6.4.299",
+    "qrcode": "1.5.4",
+    "ws": "8.22.0"
+  },
+  "devDependencies": { "@playwright/test": "1.64.1" }
+}

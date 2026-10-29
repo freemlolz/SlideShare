@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111a2b">
+  <title>SlideSync Local — перегляд</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script type="module" src="/assets/viewer.js"></script>
+</head>
+<body class="viewer">
+  <header class="viewer-header"><span class="brand"><span class="brand-mark">S</span> SlideSync <span class="muted">Local</span></span><span id="connection" class="status" role="status">Підключення…</span></header>
+  <main class="viewer-main"><div class="stage" id="stage"><img id="slide-image" alt="Поточний слайд ведучого" hidden><div id="empty" class="empty"><h1>Приєднуємося до показу…</h1><p>Залишайте цю сторінку відкритою.</p></div></div></main>
+  <footer class="viewer-footer"><div><strong id="page-label">Очікуємо презентацію</strong><p id="preload" class="small muted" role="status">Слайди завантажаться заздалегідь</p></div><button id="fullscreen" class="secondary">Розгорнути</button></footer>
+  <p id="error" class="viewer-error error" role="alert" hidden></p>
+  <p class="viewer-tip">Показ керується ведучим · Поверніть телефон горизонтально для більшого зображення</p>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SlideSync Local — ведучий</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script type="module" src="/assets/host.js"></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/host"><span class="brand-mark">S</span> SlideSync <span class="muted">Local</span></a><span class="local-badge">Локальна мережа · 0 грн</span></header>
+  <main class="host-layout">
+    <section class="presentation">
+      <div class="section-heading"><div><p class="eyebrow">ПУЛЬТ ВЕДУЧОГО</p><h1>Ваші слайди. На кожному екрані.</h1></div><span id="connection" class="status" role="status">Підключення…</span></div>
+      <div class="stage" id="stage">
+        <img id="slide-image" alt="Поточний слайд" hidden>
+        <div id="empty" class="empty"><span class="empty-icon">▤</span><h2>Почніть із презентації</h2><p>Завантажте PDF. Учасники побачать слайди<br>у браузері свого телефона.</p></div>
+      </div>
+      <div class="slide-controls"><button id="previous" class="square" aria-label="Попередній слайд" disabled>←</button><label class="page-picker">Слайд <input id="slide-number" type="number" min="1" value="1" aria-label="Номер слайда" disabled> <span id="page-total">/ 0</span></label><button id="next" class="square" aria-label="Наступний слайд" disabled>→</button><button id="fullscreen" class="subtle">На весь екран</button></div>
+      <div class="deck-info"><span id="deck-name">PDF ще не завантажено</span><span class="muted">← → або пробіл для перемикання</span></div>
+      <form id="upload-form" class="upload-panel"><div><label for="pdf" class="upload-label">Додати презентацію</label><p class="muted small">PDF до 40 МіБ · до 150 слайдів · файли залишаються на ноутбуці</p></div><div class="upload-actions"><input id="pdf" name="pdf" type="file" accept="application/pdf,.pdf" required><button id="upload" class="primary" type="submit">Завантажити PDF</button></div></form>
+      <p id="upload-progress" class="small" role="status"></p>
+      <p id="error" class="error" role="alert" hidden></p>
+    </section>
+    <aside class="sidebar">
+      <section class="card join-card"><p class="eyebrow">ЗАПРОСІТЬ УЧАСНИКІВ</p><h2>Один QR. Усі разом.</h2><p class="muted">Та сама Wi-Fi-мережа. Жодних застосунків.</p><div class="qr-wrap"><img id="qr" alt="QR-код для приєднання" hidden></div><label class="small" for="network">Адреса ноутбука</label><select id="network" aria-label="Мережевий інтерфейс"></select><a id="join-url" class="join-url" target="_blank" rel="noreferrer"></a><button id="copy" class="secondary">Скопіювати посилання</button><p id="copy-status" class="small" role="status"></p></section>
+      <section class="card"><div class="metrics"><div><strong id="participants">0</strong><span>підключено</span></div><div><strong id="ready">0</strong><span>усі слайди готові</span></div></div><p class="small muted">Готовність означає, що телефон завантажив усі слайди. Перед початком дочекайтеся учасників.</p></section>
+      <details class="card help"><summary>Телефон не підключається?</summary><ol><li>Оберіть адресу Wi-Fi, якщо є VPN або кілька мереж.</li><li>Відкрийте QR у звичайному Safari або Chrome.</li><li>Дозвольте вхідні з’єднання для Node.js у брандмауері ноутбука.</li><li>Гостьова мережа може блокувати зв’язок між пристроями.</li></ol><p>Ноутбук має залишатися увімкненим. Bluetooth не використовується.</p></details>
+    </aside>
+  </main>
+</body>
+</html>
