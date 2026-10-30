@@ -6,11 +6,12 @@
   <meta name="theme-color" content="#111a2b">
   <title>SlideSync Local — перегляд</title>
   <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/polls.css">
   <script type="module" src="/assets/viewer.js"></script>
 </head>
 <body class="viewer">
   <header class="viewer-header"><span class="brand"><span class="brand-mark">S</span> SlideSync <span class="muted">Local</span></span><span id="connection" class="status" role="status">Підключення…</span></header>
-  <main class="viewer-main"><div class="stage" id="stage"><img id="slide-image" alt="Поточний слайд ведучого" hidden><canvas id="annotations" class="annotations" aria-label="Малюнки ведучого"></canvas><div id="empty" class="empty"><h1>Приєднуємося до показу…</h1><p>Залишайте цю сторінку відкритою.</p></div></div></main>
+  <main class="viewer-main"><div class="stage" id="stage"><img id="slide-image" alt="Поточний слайд ведучого" hidden><canvas id="annotations" class="annotations" aria-label="Малюнки ведучого"></canvas><div id="empty" class="empty"><h1>Приєднуємося до показу…</h1><p>Залишайте цю сторінку відкритою.</p></div><section id="viewer-poll" class="poll-screen" hidden></section></div></main>
   <nav class="viewer-navigation" aria-label="Перегляд слайдів"><button id="viewer-previous" aria-label="Попередній слайд" disabled>←</button><span id="follow-status" role="status">Разом із ведучим</span><button id="viewer-next" aria-label="Наступний слайд" disabled>→</button><button id="go-live" disabled>До поточного слайда</button></nav>
   <footer class="viewer-footer"><div><strong id="page-label">Очікуємо презентацію</strong><p id="preload" class="small muted" role="status">Слайди завантажаться заздалегідь</p></div><button id="fullscreen" class="secondary">Розгорнути</button></footer>
   <p id="error" class="viewer-error error" role="alert" hidden></p>

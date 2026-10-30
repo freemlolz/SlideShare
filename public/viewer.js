@@ -1,6 +1,8 @@
 import { createSync, takeToken, connectionLabel, setupFullscreen } from './sync.js';
 import { createSlides } from './slides.js';
 import { createAnnotations } from './annotations.js';
+import { createPollScreen } from './polls.js';
+import { readApiResponse } from './api.js';
 
 const element = (id) => document.getElementById(id);
 const token = takeToken('viewer');
@@ -11,6 +13,20 @@ let browsing = null;
 let furthestSlide = 0;
 function showError(message) { element('error').textContent = message; element('error').hidden = false; }
 const annotations = createAnnotations({ canvas: element('annotations'), image: element('slide-image') });
+const pollScreen = createPollScreen({ root: element('viewer-poll'), role: 'viewer', onError: showError,
+  async onVote(pollId, answer) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    try {
+      const response = await fetch(`/api/polls/vote?token=${encodeURIComponent(token)}`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pollId, answer }), signal: controller.signal });
+      const body = await readApiResponse(response);
+      applyState(body);
+    } catch (error) {
+      void sync.refresh();
+      throw new Error(error.name === 'AbortError' ? 'Не вдалося підтвердити голос. Перевірте з’єднання.' : error.message);
+    } finally { clearTimeout(timeout); }
+  } });
 const slides = createSlides({
   image: element('slide-image'), empty: element('empty'), token, onError: showError,
   onDisplay: annotations.refresh,
@@ -27,6 +43,7 @@ const slides = createSlides({
 });
 
 function render() {
+  pollScreen.update(state);
   const index = browsing ?? state.slide;
   const count = state.deck?.pages.length ?? 0;
   element('page-label').textContent = count ? `Слайд ${index + 1} / ${count}` : 'Очікуємо презентацію';
@@ -39,16 +56,19 @@ function render() {
   slides.update({ ...state, slide: index });
 }
 
+function applyState(nextState) {
+  if (state?.sessionId === nextState.sessionId && nextState.revision < state.revision) return;
+  if (state?.deck?.id !== nextState.deck?.id || state?.sessionId !== nextState.sessionId) {
+    browsing = null;
+    furthestSlide = 0;
+  }
+  state = nextState;
+  furthestSlide = Math.max(furthestSlide, state.slide);
+  render();
+}
+
 sync = createSync({ role: 'viewer', token,
-  onState(nextState) {
-    if (state?.deck?.id !== nextState.deck?.id || state?.sessionId !== nextState.sessionId) {
-      browsing = null;
-      furthestSlide = 0;
-    }
-    state = nextState;
-    furthestSlide = Math.max(furthestSlide, state.slide);
-    render();
-  },
+  onState: applyState,
   onConnection(status) { connectionLabel(element('connection'), status); },
   onError: showError,
   onOpen() { lastReport = null; slides.report(); },

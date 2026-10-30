@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>SlideSync Local — ведучий</title>
   <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/polls.css">
   <script type="module" src="/assets/host.js"></script>
 </head>
 <body>
@@ -17,6 +18,7 @@
         <img id="slide-image" alt="Поточний слайд" hidden>
         <canvas id="annotations" class="annotations" aria-label="Малювання на слайді"></canvas>
         <div id="empty" class="empty"><span class="empty-icon">▤</span><h2>Почніть із презентації</h2><p>Завантажте PDF. Учасники побачать слайди<br>у браузері свого телефона.</p></div>
+        <section id="host-poll" class="poll-screen" hidden></section>
       </div>
       <div class="drawing-toolbar" role="group" aria-label="Інструменти малювання">
         <button id="draw-toggle" type="button" aria-pressed="false" disabled>Малювати</button>
@@ -26,11 +28,13 @@
         <label>Зберігати<select id="draw-lifetime" disabled><option value="5000">5 секунд</option><option value="0">До очищення</option></select></label>
         <button id="draw-clear" type="button" disabled>Очистити</button>
       </div>
+      <aside id="poll-launcher" class="poll-launcher" aria-label="Віджет опитувань ведучого"></aside>
       </div>
       <div class="slide-controls"><button id="previous" class="square" aria-label="Попередній слайд" disabled>←</button><label class="page-picker">Слайд <input id="slide-number" type="number" min="1" value="1" aria-label="Номер слайда" disabled> <span id="page-total">/ 0</span></label><button id="next" class="square" aria-label="Наступний слайд" disabled>→</button><button id="fullscreen" class="subtle">На весь екран</button></div>
       <div class="deck-info"><span id="deck-name">PDF ще не завантажено</span><span class="muted">← → або пробіл для перемикання</span></div>
       <form id="upload-form" class="upload-panel"><div><label for="pdf" class="upload-label">Додати презентацію</label><p class="muted small">PDF до 40 МіБ · до 150 слайдів · файли залишаються на ноутбуці</p></div><div class="upload-actions"><input id="pdf" name="pdf" type="file" accept="application/pdf,.pdf" required><button id="upload" class="primary" type="submit">Завантажити PDF</button></div></form>
       <p id="upload-progress" class="small" role="status"></p>
+      <section id="poll-library" class="poll-library" aria-label="Опитування аудиторії"></section>
       <p id="error" class="error" role="alert" hidden></p>
     </section>
     <aside class="sidebar">

@@ -33,6 +33,7 @@ Keep the laptop awake and the server running. Use `npm run demo` to generate a s
 - **Clean transitions:** changing slides clears all ink. Manual clear uses a short fade.
 - **Personal browsing:** revisit earlier slides on your phone, then return to the presenter's current slide.
 - **Local rendering:** PDF pages become JPEGs on the laptop and preload on phones.
+- **Quick polls:** save 2- or 4-choice questions, then launch from a floating presenter-only widget, including fullscreen. Vote for 10 seconds; results appear on every screen automatically.
 
 <table>
   <tr><th>Presenter</th><th>Phone</th></tr>
@@ -65,3 +66,4 @@ Chromium and mobile WebKit scenarios cover drawing, fading, history, reconnect, 
 - [Full setup & Safari troubleshooting — Ukrainian](docs/README.uk.md)
 - [Architecture](docs/ARCHITECTURE.md) · [Specification](docs/SPECIFICATION.md)
 - [Test guide](docs/TESTING.md) · [Validation record](docs/VALIDATION.md)
+- [Polls: setup, behavior & limits — Ukrainian](docs/POLLS.md)

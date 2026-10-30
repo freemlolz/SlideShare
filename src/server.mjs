@@ -2,7 +2,7 @@ import http from 'node:http';
 import { networkInterfaces, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdtemp, mkdir, open, rm } from 'node:fs/promises';
 import { Worker } from 'node:worker_threads';
 import express from 'express';
@@ -10,6 +10,7 @@ import multer from 'multer';
 import QRCode from 'qrcode';
 import { WebSocketServer, WebSocket } from 'ws';
 import { AnnotationLayer } from './annotations.mjs';
+import { PollSession } from './polls.mjs';
 
 const publicRoot = fileURLToPath(new URL('../public/', import.meta.url));
 export const LIMITS = { pdfBytes: 40 * 1024 * 1024, pages: 150, imageBytes: 48 * 1024 * 1024, renderMs: 120_000 };
@@ -59,12 +60,15 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
   let activeUpload = null;
   let actualPort;
   const annotations = new AnnotationLayer(broadcast);
+  const polls = new PollSession(broadcast);
+  const voterCookie = `slidesync-voter-${sessionId}`;
 
-  function snapshot() {
+  function snapshot(voterId) {
     const viewers = [...sockets.clients].filter((client) => client.role === 'viewer' && client.readyState === WebSocket.OPEN);
     return {
       type: 'state', sessionId, revision, slide, deck, processing,
       serverTime: Date.now(), annotations: annotations.snapshot(),
+      poll: polls.snapshot(voterId),
       participants: viewers.length,
       ready: viewers.filter((client) => deck && client.deckId === deck.id && client.loaded === deck.pages.length).length,
     };
@@ -79,7 +83,7 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
   function broadcast() {
     revision += 1;
     const state = snapshot();
-    for (const client of sockets.clients) send(client, state);
+    for (const client of sockets.clients) send(client, { ...state, poll: polls.snapshot(client.voterId) });
   }
 
   function allowedHost(request) {
@@ -106,8 +110,26 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
   }
 
   function authorizeViewer(request, response, next) {
-    if (authorizedHost(request) || sameSecret(request.query.token, viewerToken)) return next();
+    if (authorizedHost(request)) return next();
+    if (sameSecret(request.query.token, viewerToken)) {
+      request.voterId = voterIdentity(request, response);
+      return next();
+    }
     response.status(401).json({ error: 'Сесію не знайдено. Відскануйте актуальний QR-код.' });
+  }
+
+  function voterIdentity(request, response) {
+    const cookie = request.headers.cookie?.split(';').map((part) => part.trim())
+      .find((part) => part.startsWith(`${voterCookie}=`))?.slice(voterCookie.length + 1);
+    const sign = (identity) => createHmac('sha256', hostToken).update(identity).digest('hex');
+    if (cookie && /^[a-f0-9]{32}\.[a-f0-9]{64}$/.test(cookie)) {
+      const [identity, signature] = cookie.split('.');
+      if (sameSecret(signature, sign(identity))) return identity;
+    }
+    if (!response) return null;
+    const identity = randomBytes(16).toString('hex');
+    response.cookie(voterCookie, `${identity}.${sign(identity)}`, { httpOnly: true, sameSite: 'strict', path: '/' });
+    return identity;
   }
 
   app.use((request, response, next) => {
@@ -120,7 +142,7 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
     if (!allowedHost(request) || !sameOrigin(request)) return response.status(403).json({ error: 'Недозволене джерело запиту.' });
     next();
   });
-  app.use(express.json({ limit: '2kb' }));
+  app.use(express.json({ limit: '4kb' }));
   app.get('/', (request, response) => response.redirect(isLoopback(request.socket.remoteAddress) ? '/host' : '/join'));
   app.get('/host', (request, response) => {
     if (!isLoopback(request.socket.remoteAddress)) return response.sendStatus(403);
@@ -128,7 +150,7 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
   });
   app.get('/join', (request, response) => response.sendFile(path.join(publicRoot, 'viewer.html')));
   app.use('/assets', express.static(publicRoot, { index: false, dotfiles: 'deny', maxAge: 0 }));
-  app.get('/api/state', authorizeViewer, (request, response) => response.json(snapshot()));
+  app.get('/api/state', authorizeViewer, (request, response) => response.json(snapshot(request.voterId)));
   app.get('/api/host/config', authorizeHost, async (request, response) => {
     const sorted = lanAddress ? [lanAddress, ...addresses.filter((address) => address !== lanAddress)] : addresses;
     const links = await Promise.all(sorted.map(async (address) => {
@@ -246,6 +268,26 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
     response.json(snapshot());
   });
 
+  app.post('/api/host/polls/start', authorizeHost, (request, response) => {
+    polls.start(request.body);
+    broadcast();
+    response.json(snapshot());
+  });
+
+  app.post('/api/host/polls/cancel', authorizeHost, (request, response) => {
+    polls.cancel(request.body?.pollId);
+    broadcast();
+    response.json(snapshot());
+  });
+
+  app.post('/api/polls/vote', authorizeViewer, (request, response) => {
+    if (!request.voterId) return response.status(403).json({ error: 'Голосування доступне учасникам через посилання з QR-коду.' });
+    if (!voterIdentity(request)) return response.status(400).json({ error: 'Для голосування дозвольте cookie та оновіть сторінку.' });
+    polls.vote(request.body, request.voterId);
+    broadcast();
+    response.json(snapshot(request.voterId));
+  });
+
   app.get('/slides/:deckId/:page', authorizeViewer, (request, response) => {
     const match = /^(\d+)\.jpg$/.exec(request.params.page);
     const pageNumber = match ? Number(match[1]) : 0;
@@ -253,6 +295,8 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
     response.set('Cache-Control', 'private, max-age=86400, immutable');
     response.sendFile(path.join(storage, deck.id, 'slides', `${pageNumber}.jpg`));
   });
+
+  app.use('/api', (request, response) => response.status(404).json({ error: 'API-маршрут не знайдено. Перезапустіть SlideSync Local та відкрийте нове посилання ведучого.' }));
 
   app.use((error, request, response, next) => {
     if (response.headersSent) return next(error);
@@ -268,15 +312,17 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
     const url = new URL(request.url, 'http://localhost');
     const role = url.searchParams.get('role') === 'host' ? 'host' : 'viewer';
     const token = url.searchParams.get('token');
+    const voterId = role === 'viewer' ? voterIdentity(request) : null;
     const authorized = role === 'host'
       ? isLoopback(request.socket.remoteAddress) && sameSecret(token, hostToken)
-      : sameSecret(token, viewerToken);
+      : sameSecret(token, viewerToken) && Boolean(voterId);
     if (closing || url.pathname !== '/ws' || !allowedHost(request) || !sameOrigin(request) || !authorized) {
       socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
       return;
     }
     sockets.handleUpgrade(request, socket, head, (client) => {
       client.role = role;
+      client.voterId = voterId;
       client.alive = true;
       client.loaded = 0;
       client.on('error', () => {});
@@ -304,7 +350,7 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
       if (!client.alive) { client.terminate(); continue; }
       client.alive = false;
       client.ping();
-      send(client, snapshot());
+      send(client, snapshot(client.voterId));
     }
   }, 10_000);
   heartbeat.unref();
@@ -314,6 +360,7 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
     actualPort = server.address().port;
   } catch (error) {
     clearInterval(heartbeat);
+    polls.close();
     await rm(storage, { recursive: true, force: true });
     throw error;
   }
@@ -326,6 +373,7 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
       closing = true;
       clearInterval(heartbeat);
       annotations.close();
+      polls.close();
       if (activeWorker) await activeWorker.terminate();
       for (const client of sockets.clients) client.terminate();
       sockets.close();

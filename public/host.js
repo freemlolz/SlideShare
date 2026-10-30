@@ -1,6 +1,9 @@
 import { createSync, takeToken, connectionLabel, setupFullscreen } from './sync.js';
 import { createSlides } from './slides.js';
 import { createAnnotations } from './annotations.js';
+import { createPollLibrary, createPollScreen } from './polls.js';
+import { createPollLauncher } from './poll-launcher.js';
+import { readApiResponse } from './api.js';
 
 const element = (id) => document.getElementById(id);
 const token = takeToken('host');
@@ -12,6 +15,7 @@ let uploading = false;
 let drawingEnabled = false;
 let drawingTimer;
 let drawingSending = false;
+let launchingPoll = false;
 const pendingStrokes = new Map();
 function showError(message) { element('error').textContent = message; element('error').hidden = false; }
 const annotations = createAnnotations({
@@ -27,6 +31,30 @@ const annotations = createAnnotations({
 });
 const slides = createSlides({ image: element('slide-image'), empty: element('empty'), headers,
   onError: showError, onDisplay: annotations.refresh });
+const pollScreen = createPollScreen({ root: element('host-poll'), role: 'host', onError: showError,
+  onDismiss: dismissPoll });
+const pollLauncher = createPollLauncher({ root: element('poll-launcher'), onStart: startPoll, onDismiss: dismissPoll,
+  async onManage() {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    element('poll-library').scrollIntoView({ block: 'start' });
+    element('poll-new').focus();
+  } });
+const pollLibrary = createPollLibrary({ root: element('poll-library'),
+  onStart: startPoll, onChange: pollLauncher.setPolls });
+
+async function startPoll(poll) {
+  if (!state || !Object.hasOwn(state, 'poll')) throw new Error('Перезапустіть SlideSync Local та відкрийте нове посилання ведучого з термінала.');
+  if (launchingPoll) throw new Error('Запит запуску вже надіслано. Зачекайте.');
+  launchingPoll = true;
+  try {
+    update(await api('/api/host/polls/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(poll) }));
+    element('host-poll-question').focus();
+  } finally { launchingPoll = false; }
+}
+
+async function dismissPoll(pollId) {
+  update(await api('/api/host/polls/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pollId }) }));
+}
 
 function currentStroke(stroke) {
   return state?.deck?.id === stroke.deckId && state.slide === stroke.index && state.annotations?.epoch === stroke.epoch;
@@ -72,24 +100,29 @@ function update(nextState) {
   if (state?.deck?.id !== nextState.deck?.id || state?.slide !== nextState.slide
     || state?.annotations?.epoch !== nextState.annotations?.epoch) pendingStrokes.clear();
   state = nextState;
+  pollScreen.update(state);
+  pollLibrary.update(state);
+  pollLauncher.update(state);
+  if (!Object.hasOwn(state, 'poll')) showError('Сервер запущений до оновлення опитувань. Перезапустіть SlideSync Local та відкрийте нове посилання ведучого з термінала.');
+  annotations.setEnabled(drawingEnabled && !state.poll);
   annotations.update(state);
   slides.update(state);
   const count = state.deck?.pages.length ?? 0;
   element('page-total').textContent = `/ ${count}`;
   if (document.activeElement !== element('slide-number')) element('slide-number').value = state.slide + 1;
   element('slide-number').max = count;
-  element('slide-number').disabled = !count;
-  element('previous').disabled = !count || state.slide === 0 || changing;
-  element('next').disabled = !count || state.slide === count - 1 || changing;
+  element('slide-number').disabled = !count || Boolean(state.poll);
+  element('previous').disabled = !count || state.slide === 0 || changing || Boolean(state.poll);
+  element('next').disabled = !count || state.slide === count - 1 || changing || Boolean(state.poll);
   element('participants').textContent = state.participants;
   element('ready').textContent = state.ready;
   element('deck-name').textContent = state.deck ? `${state.deck.name} · ${(state.deck.totalBytes / 1024 / 1024).toFixed(1)} МіБ для учасника` : 'PDF ще не завантажено';
   element('upload-progress').textContent = state.processing
     ? `Готуємо слайди: ${state.processing.done} / ${state.processing.total ?? '…'}. Поточна презентація залишається доступною.`
     : uploading ? 'Передаємо PDF на локальний сервер…' : state.deck ? 'Презентація готова. Учасники завантажують слайди автоматично.' : '';
-  element('upload').disabled = uploading || Boolean(state.processing);
+  element('upload').disabled = uploading || Boolean(state.processing) || Boolean(state.poll);
   for (const id of ['draw-toggle', 'draw-tool', 'draw-size', 'draw-color', 'draw-lifetime', 'draw-clear']) {
-    element(id).disabled = !count;
+    element(id).disabled = !count || Boolean(state.poll);
   }
 }
 
@@ -98,13 +131,11 @@ const sync = createSync({ role: 'host', token, onState: update,
 
 async function api(url, options) {
   const response = await fetch(url, { ...options, headers: { ...headers, ...options?.headers } });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error);
-  return body;
+  return readApiResponse(response);
 }
 
 async function changeSlide(index) {
-  if (changing || !state?.deck || index < 0 || index >= state.deck.pages.length || !Number.isInteger(index)) return;
+  if (changing || state?.poll || !state?.deck || index < 0 || index >= state.deck.pages.length || !Number.isInteger(index)) return;
   changing = true;
   update(state);
   try {
@@ -144,7 +175,7 @@ document.addEventListener('keydown', (event) => {
 element('upload-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const file = element('pdf').files[0];
-  if (!file || uploading) return;
+  if (!file || uploading || state?.poll) return;
   if (file.size > 40 * 1024 * 1024) { showError('PDF перевищує 40 МіБ.'); return; }
   uploading = true;
   element('error').hidden = true;

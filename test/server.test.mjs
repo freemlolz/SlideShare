@@ -11,10 +11,13 @@ import { makePdf } from '../scripts/create-demo.mjs';
 let application;
 let base;
 let deck;
+let viewerCookie;
 const clients = [];
 before(async () => {
   application = await createSlideSync({ port: 0, host: '127.0.0.1' });
   base = `http://127.0.0.1:${application.port}`;
+  const response = await fetch(`${base}/api/state?token=${application.viewerToken}`);
+  viewerCookie = response.headers.get('set-cookie').split(';')[0];
 });
 after(async () => {
   for (const client of clients) client.terminate();
@@ -46,12 +49,16 @@ function waitState(client, predicate) {
   });
 }
 function connect() {
-  const client = new WebSocket(`${base.replace('http:', 'ws:')}/ws?token=${application.viewerToken}`, { origin: base });
+  const client = new WebSocket(`${base.replace('http:', 'ws:')}/ws?token=${application.viewerToken}`, { origin: base, headers: { Cookie: viewerCookie } });
   clients.push(client);
   return client;
 }
 
 test('requires session credentials; blocks other origins and DNS rebinding hosts', async () => {
+  const missing = await fetch(`${base}/api/unknown`);
+  assert.equal(missing.status, 404);
+  assert.match(missing.headers.get('content-type'), /application\/json/);
+  assert.match((await missing.json()).error, /Перезапустіть/);
   assert.equal((await fetch(`${base}/api/state`)).status, 401);
   assert.equal((await fetch(`${base}/api/host/config`)).status, 403);
   assert.equal((await fetch(`${base}/api/state?token=${'ї'.repeat(48)}`)).status, 401);
@@ -169,13 +176,16 @@ test('rejects oversized uploads and extra multipart fields', async () => {
   assert.equal((await hostFetch('/api/host/pdf', { method: 'POST', body })).status, 400);
 });
 
-test('WebSocket rejects foreign origins, invalid roles and invalid tokens without server failure', async () => {
+test('WebSocket rejects foreign origins, invalid roles, invalid tokens and missing voter cookies', async () => {
   for (const options of [
+    { query: `token=${application.viewerToken}`, origin: base, withoutCookie: true },
     { query: `token=${application.viewerToken}`, origin: 'https://evil.example' },
     { query: `token=${application.viewerToken}&role=host`, origin: base },
     { query: `token=${encodeURIComponent('ї'.repeat(48))}`, origin: base },
   ]) {
-    const client = new WebSocket(`${base.replace('http:', 'ws:')}/ws?${options.query}`, { origin: options.origin });
+    const client = new WebSocket(`${base.replace('http:', 'ws:')}/ws?${options.query}`, {
+      origin: options.origin, headers: options.withoutCookie ? {} : { Cookie: viewerCookie },
+    });
     const [error] = await once(client, 'error');
     assert.match(error.message, /403/);
   }
