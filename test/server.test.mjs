@@ -218,3 +218,38 @@ test('LAN requests can view but cannot control even with the host token', async 
     assert.match(error.message, /403/);
   } finally { await lan.close(); }
 });
+
+test('annotations synchronize, require host access and clear across slide and deck changes', async () => {
+  let state = await upload(makePdf(3)).then((response) => response.json());
+  const client = connect();
+  await waitState(client, (message) => message.deck?.id === state.deck.id);
+  const draw = (body) => hostFetch('/api/host/annotations', { method: 'POST',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const payload = { action: 'append', deckId: state.deck.id, index: 0, epoch: state.annotations.epoch,
+    id: 'streamed', tool: 'marker', size: 12, color: '#00aaff', lifetime: 0,
+    points: [[0.2, 0.3, 0.6]], finished: false };
+  const synced = waitState(client, (message) => message.annotations?.strokes.length === 1);
+  assert.equal((await draw(payload)).status, 200);
+  assert.equal((await synced).annotations.strokes[0].finished, false);
+  const complete = await draw({ ...payload, points: [[0.4, 0.5, 0.6]], finished: true }).then((response) => response.json());
+  assert.equal(complete.annotations.strokes[0].points.length, 2);
+  assert.equal(complete.annotations.strokes[0].expiresAt, null);
+  const forbidden = await fetch(`${base}/api/host/annotations?token=${application.viewerToken}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, action: 'clear' }) });
+  assert.equal(forbidden.status, 403);
+  const sameSlide = await hostFetch('/api/host/slide', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deckId: state.deck.id, index: 0 }) }).then((response) => response.json());
+  assert.equal(sameSlide.annotations.strokes.length, 1);
+  const cleared = await draw({ ...payload, action: 'clear' }).then((response) => response.json());
+  assert.equal(cleared.annotations.strokes.length, 0);
+  assert.equal((await draw({ ...payload, id: 'late' })).status, 409);
+  assert.equal((await draw({ ...payload, id: 'new', epoch: cleared.annotations.epoch, finished: true })).status, 200);
+  state = await hostFetch('/api/host/slide', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deckId: state.deck.id, index: 1 }) }).then((response) => response.json());
+  assert.equal(state.annotations.strokes.length, 0);
+  assert.equal((await draw({ ...payload, epoch: state.annotations.epoch, id: 'wrong-slide' })).status, 409);
+  assert.equal((await draw({ ...payload, epoch: state.annotations.epoch, index: 1, id: 'on-second', finished: true })).status, 200);
+  state = await upload(makePdf(2)).then((response) => response.json());
+  assert.equal(state.annotations.strokes.length, 0);
+  assert.equal(state.slide, 0);
+});

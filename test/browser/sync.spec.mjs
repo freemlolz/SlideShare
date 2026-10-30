@@ -76,6 +76,20 @@ test('viewer remains usable through HTTP polling when WebSockets fail', async ({
     await fetch(`${base}/api/host/slide`, { method: 'POST', headers: { 'X-Host-Token': application.hostToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ deckId: uploaded.deck.id, index: 2 }) });
     await expect(page.locator('#page-label')).toHaveText('Слайд 3 / 3');
     await expect(page.locator('#slide-image')).toBeVisible();
+    const state = await fetch(`${base}/api/state?token=${application.viewerToken}`).then((response) => response.json());
+    const drawing = await fetch(`${base}/api/host/annotations`, { method: 'POST',
+      headers: { 'X-Host-Token': application.hostToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'append', deckId: state.deck.id, index: state.slide, epoch: state.annotations.epoch,
+        id: 'fallback-ink', tool: 'marker', color: '#ef4444', size: 20, lifetime: 0,
+        points: [[0.3, 0.4, 0.6], [0.6, 0.5, 0.6]], finished: true }) });
+    expect(drawing.ok).toBeTruthy();
+    await expect(page.locator('#annotations')).toHaveAttribute('data-stroke-count', '1');
+    await page.locator('#viewer-previous').click();
+    await expect(page.locator('#page-label')).toHaveText('Слайд 2 / 3');
+    await expect(page.locator('#annotations')).toHaveAttribute('data-stroke-count', '0');
+    await page.locator('#go-live').click();
+    await expect(page.locator('#page-label')).toHaveText('Слайд 3 / 3');
+    await expect(page.locator('#annotations')).toHaveAttribute('data-stroke-count', '1');
   } finally { await context.close(); }
 });
 

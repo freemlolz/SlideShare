@@ -1,112 +1,56 @@
+![SlideSync Local — one deck, every screen](docs/images/banner.svg)
+
+![Node.js 22.13+, offline LAN, no phone installs](docs/images/badges.svg)
+
 # SlideSync Local
 
-Безкоштовний локальний застосунок для показу PDF-презентації на телефонах учасників. Працює через Wi-Fi та браузер: на iPhone і Android нічого встановлювати не потрібно. Платні API, облікові записи та хмарні сервери не використовуються.
+Sync PDF slides to phone browsers over Wi-Fi. No installs. No cloud.
 
-Ця папка є окремим проєктом і локальним Git-репозиторієм. Для подальшої роботи відкривайте саме її, а не попередній експорт у папці `outputs` чату.
+**[Quick start](#quick-start)** · **[Features](#features)** · **[Testing](#testing)** · **[Українська інструкція](docs/README.uk.md)**
 
-## Швидкий запуск
+## Quick start
 
-Потрібен **Node.js 22.13 або новіший**; рекомендована підтримувана LTS-версія. Node.js доступний безкоштовно на [nodejs.org](https://nodejs.org/). На ноутбуці також потрібен браузер.
-
-Відкрийте термінал у цій папці:
+Requires **Node.js 22.13+**. Install dependencies once; presentations then work without internet.
 
 ```sh
+git clone https://github.com/freemlolz/SlideShare.git
+cd SlideShare
 npm ci
 npm start
 ```
 
-Інтернет потрібен лише для початкового встановлення Node.js і залежностей. Після встановлення сервер, QR, конвертація PDF та показ працюють без інтернету. Не переносіть `node_modules` між різними ОС або архітектурами: модуль рендерингу має платформні бінарні файли.
+1. Open the full presenter URL printed in your terminal, including `#token=…`.
+2. Upload a PDF and connect phones to the same Wi-Fi network.
+3. Scan the QR code in Safari or Chrome. Wait for slides to preload, then present.
 
-1. Скопіюйте з термінала **повне посилання ведучого**, включно з `#token=…`, і відкрийте його на ноутбуці. Приклад формату: `http://127.0.0.1:3000/host#token=…`.
-2. Завантажте PDF і дочекайтеся завершення підготовки. Для демонстраційного файла виконайте `npm run demo` та оберіть створений `demo.pdf`.
-3. Підключіть телефони до тієї самої Wi-Fi-мережі, що й ноутбук. Ноутбук може бути підключений кабелем до тієї самої локальної мережі.
-4. Якщо в ноутбука кілька мережевих адрес, оберіть у пульті адресу Wi-Fi. Відскануйте QR телефоном і відкрийте посилання у звичайному Safari або Chrome.
-5. Телефон одразу показує поточний слайд і завантажує решту. Перед початком дочекайтеся показника «усі слайди готові» для потрібних учасників.
-6. Перемикайте слайди кнопками, стрілками, пробілом, PageUp/PageDown, Home/End або введіть номер слайда. Телефони слідують за ведучим.
-7. Для завершення натисніть `Ctrl+C` у терміналі. Тимчасові PDF і слайди видаляються; початковий файл користувача не змінюється.
+Keep the laptop awake and the server running. Use `npm run demo` to generate a sample PDF. The app interface is currently in Ukrainian.
 
-Застосунок не відкриває браузер автоматично. Термінал має залишатися запущеним. Не переводьте ноутбук у режим сну під час показу.
+## Features
 
-## Налаштування мережі
+- **Live sync:** WebSocket updates, reconnect, and HTTP fallback.
+- **Shared ink:** pencil, pressure-aware brush, and translucent marker; four sizes and any color.
+- **Smooth fading:** temporary strokes disappear within five seconds, with a one-second fade; persistent strokes stay until cleared.
+- **Clean transitions:** changing slides clears all ink. Manual clear uses a short fade.
+- **Personal browsing:** revisit earlier slides on your phone, then return to the presenter's current slide.
+- **Local rendering:** PDF pages become JPEGs on the laptop and preload on phones.
 
-Сервер слухає IPv4-інтерфейси на `0.0.0.0:3000`. Керування дозволено лише через loopback ноутбука та окремий ключ ведучого. Учасник отримує інший ключ, який дозволяє лише перегляд.
+<table>
+  <tr><th>Presenter</th><th>Phone</th></tr>
+  <tr>
+    <td><img src="docs/images/host.png" height="330" alt="Presenter controls with live drawing tools and a join QR code"></td>
+    <td><img src="docs/images/phone.png" height="330" alt="Phone browser showing shared ink and independent slide navigation"></td>
+  </tr>
+</table>
 
-Якщо порт зайнятий, на macOS/Linux:
+Screenshots use a completed demo session. Join with the QR code in your running app.
 
-```sh
-PORT=3001 npm start
-```
+## Network & limits
 
-Для Windows PowerShell:
+Use a trusted LAN that allows phones to reach the laptop. Guest Wi-Fi client isolation can block connections. HTTP/WS traffic is not encrypted; do not expose this server to the internet.
 
-```powershell
-$env:PORT="3001"
-npm start
-```
+PDFs: **40 MiB / 150 pages**. Rendered images: **1600 px longest edge / 48 MiB total**. Password-protected PDFs are not supported. Presenter controls require the laptop's loopback address and a separate token.
 
-Щоб певна адреса активного інтерфейсу була першою в списку QR, на macOS/Linux:
-
-```sh
-LAN_ADDRESS=192.168.1.42 npm start
-```
-
-Замініть приклад реальною IPv4-адресою ноутбука. Адреса перевіряється за активними інтерфейсами. Після зміни Wi-Fi, DHCP-адреси або порту перезапустіть сервер і повторно відскануйте новий QR. VPN-адреси можуть потрапити до списку: автоматично визначити потрібний маршрутизатор на всіх ОС неможливо.
-
-Локальний роутер без доступу до інтернету підходить. Хотспот ноутбука також може підійти, якщо ОС і налаштування дозволяють зв’язок клієнтів із ноутбуком. Хотспот телефона потрібно перевіряти окремо: правила маршрутизації та ізоляція залежать від пристрою. Bluetooth до MVP не входить.
-
-## iPhone / Safari
-
-Відкривайте **повну адресу `http://IPv4:порт/join#token=…` безпосередньо в Safari**, а не у вбудованому браузері месенджера чи HTTPS-сторінці з iframe. `localhost` на телефоні означає сам телефон, а не ноутбук. QR завжди використовує мережеву IPv4-адресу ноутбука.
-
-HTTP-сторінка та WebSocket мають одне джерело. Застосунок не вимагає HTTPS, Service Worker, встановлення PWA, дозволу камери в браузері або Bonjour/mDNS. Камера телефона потрібна лише для сканування QR системним застосунком.
-
-Якщо сторінка не відкривається:
-
-1. Перевірте однакову локальну мережу та правильну адресу в пульті. Гостьова Wi-Fi-мережа, AP/client isolation або корпоративні правила можуть блокувати зв’язок пристроїв.
-2. Дозвольте вхідні TCP-з’єднання для Node.js на обраному порту в брандмауері ноутбука. На macOS може також знадобитися дозволити локальну мережу для програми, яка запускає Node.js. Не вимикайте брандмауер повністю.
-3. Використайте звичайну вкладку Safari. Якщо браузер попереджає про HTTP, перевірте, що це адреса вашого ноутбука у довіреній мережі, та скористайтеся запропонованою браузером можливістю продовжити. Не замінюйте адресу на `https://`: цей сервер не має TLS-сертифіката.
-4. Перевірте VPN, проксі та iCloud Private Relay, якщо інші кроки не допомогли. Apple радить перевіряти ці фактори при проблемах із завантаженням сайтів. Назви та розташування налаштувань залежать від версії iOS.
-5. Залишайте вкладку активною. Після блокування екрана, переходу між застосунками чи зміни мережі браузер може призупинити з’єднання. Повернення у вкладку запускає отримання актуального стану та перепідключення.
-
-Не потрібно шукати обов’язковий перемикач «Local Network» саме для Safari: [Apple TN3179](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy) окремо описує виняток для трафіку Safari. Правила інших програм і майбутніх ОС можуть відрізнятися.
-
-Повноекранний режим залежить від браузера й пристрою. Якщо API недоступний, застосунок пропонує повернути телефон горизонтально. Підтримання екрана активним не гарантується: Wake Lock на звичайному LAN HTTP не є обов’язковою залежністю.
-
-## Що реалізовано
-
-- Пульт ведучого українською: PDF, попередній перегляд, номер слайда, клавіатура, QR і вибір адреси.
-- Перетворення всіх сторінок PDF на JPEG у фоновому потоці ноутбука. Телефони не обробляють PDF.
-- Синхронізація WebSocket; актуальний знімок стану при кожному підключенні.
-- Heartbeat, повторні спроби із затримкою та HTTP-опитування раз на 3 секунди, коли WebSocket недоступний.
-- Завантаження всіх слайдів наперед: максимум два фонові запити одночасно; поточний слайд має окремий пріоритет.
-- Збереження стиснутих JPEG як Blob URL у вкладці, декодування лише потрібного слайда. Старий кадр не зникає під час завантаження нового.
-- Кількість WebSocket-учасників та учасників із повним кешем слайдів. У резервному HTTP-режимі перегляд працює, але учасник не входить до цих лічильників.
-- Заміна презентації лише після успішної конвертації. Помилка нового PDF не руйнує поточний показ.
-- Обмеження обсягу, кількості сторінок, часу конвертації, автентифікація, перевірки Host/Origin і прибирання тимчасових даних.
-
-## Межі MVP
-
-| Параметр | Значення |
-| --- | --- |
-| Вхідний PDF | до 40 МіБ |
-| Кількість слайдів | до 150 |
-| JPEG | довша сторона 1600 px, якість 85, біле тло |
-| Сумарний обсяг JPEG | до 48 МіБ на презентацію |
-| Час конвертації | до 120 секунд |
-| Активні презентації | одна |
-| HTTP fallback | опитування раз на 3 секунди; додатково потрібен час мережевого запиту |
-
-Цільовий сценарій — невелика група в одній довіреній мережі. Автоматичні тести перевіряють 25 WebSocket-підключень на одному ноутбуці. Це не вимірювання місткості Wi-Fi і не гарантія роботи 25 реальних телефонів: потрібен окремий тест вашої мережі.
-
-PDF із паролем відхиляється. Відео, анімація, інтерактивні посилання, форми й нотатки доповідача не підтримуються як інтерактивні елементи. PDF експортується в статичні зображення; точність складних шрифтів і нестандартних PDF потрібно перевірити до виступу.
-
-Попереднє завантаження не означає повної автономності після закриття вкладки. Safari може вивантажити вкладку з пам’яті; після її перезавантаження потрібен доступ до ноутбука. При розриві мережі останній кадр лишається видимим, але нові команди надійдуть лише після відновлення зв’язку. Сервер не чекає найповільнішого учасника перед перемиканням і не гарантує покадрової одночасності.
-
-HTTP/WS не шифрує трафік. Ключі захищають від випадкового доступу, але не від перехоплення в недовіреній мережі. Не відкривайте порт в інтернет і не використовуйте конфіденційні документи у публічній Wi-Fi-мережі. Завантажуйте PDF із довірених джерел: потік рендерингу має ліміт V8-пам’яті, але це не ізольована пісочниця для ворожих файлів і не обмеження всієї нативної пам’яті.
-
-Стан показу та ключі живуть до зупинки процесу. Після нового запуску завантажте PDF знову та покажіть новий QR. Нормальна зупинка прибирає тимчасову папку системи; після аварійного завершення або `kill -9` може залишитися папка `slidesync-*` у системному тимчасовому каталозі.
-
-## Тести та документація
+## Testing
 
 ```sh
 npm test
@@ -114,13 +58,10 @@ npx playwright install chromium webkit
 npm run test:browser
 ```
 
-Завантаження тестових браузерів потребує інтернету лише один раз. Для звичайного показу Playwright і тестові браузери не потрібні. Встановлення лише робочих залежностей: `npm ci --omit=dev`.
+Chromium and mobile WebKit scenarios cover drawing, fading, history, reconnect, and fallback. Physical iPhone/Android and venue Wi-Fi still need a manual check.
 
-- [Архітектура і структура репозиторію](docs/ARCHITECTURE.md)
-- [Детальне технічне завдання](docs/SPECIFICATION.md)
-- [Автоматичні та ручні перевірки, результати](docs/TESTING.md)
-- [Протокол фактично виконаних перевірок](docs/VALIDATION.md)
+## Documentation
 
-Попередній вигляд: [пульт ведучого](docs/images/host.png), [екран телефона](docs/images/phone.png). QR на знімку належить уже завершеній тестовій сесії; для приєднання використовуйте QR запущеного застосунку.
-
-Довідкові першоджерела: [приклад серверного рендерингу PDF.js](https://github.com/mozilla/pdf.js/tree/master/examples/node/pdf2png), [правила mixed content](https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Mixed_content), [поради Apple щодо Safari](https://support.apple.com/en-gb/102456), [звіт WebKit про взаємодію WebSocket та одночасного HTTP-запиту](https://bugs.webkit.org/show_bug.cgi?id=302823). Послідовний старт HTTP-знімка і WebSocket та резервне опитування — захисні рішення MVP, а не гарантія усунення кожної помилки Safari.
+- [Full setup & Safari troubleshooting — Ukrainian](docs/README.uk.md)
+- [Architecture](docs/ARCHITECTURE.md) · [Specification](docs/SPECIFICATION.md)
+- [Test guide](docs/TESTING.md) · [Validation record](docs/VALIDATION.md)

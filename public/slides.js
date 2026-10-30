@@ -1,4 +1,4 @@
-export function createSlides({ image, empty, token, headers = {}, onProgress, onError }) {
+export function createSlides({ image, empty, token, headers = {}, onProgress, onError, onDisplay }) {
   let deck;
   let currentIndex = 0;
   let displayedIndex = -1;
@@ -26,6 +26,9 @@ export function createSlides({ image, empty, token, headers = {}, onProgress, on
     displayedIndex = -1;
     image.hidden = true;
     image.removeAttribute('src');
+    delete image.dataset.deckId;
+    delete image.dataset.slideIndex;
+    onDisplay?.();
     deck = nextDeck;
     empty.hidden = false;
     empty.textContent = deck ? 'Завантажуємо поточний слайд…' : 'Ведучий готує презентацію. Залишайте сторінку відкритою.';
@@ -61,8 +64,9 @@ export function createSlides({ image, empty, token, headers = {}, onProgress, on
   }
 
   async function display(index) {
-    if (!deck || displayedIndex === index) return;
+    if (!deck) return;
     const request = ++displayRequest;
+    if (displayedIndex === index) return;
     const requestGeneration = generation;
     try {
       const url = await load(index);
@@ -74,6 +78,9 @@ export function createSlides({ image, empty, token, headers = {}, onProgress, on
       image.hidden = false;
       empty.hidden = true;
       displayedIndex = index;
+      image.dataset.deckId = deck.id;
+      image.dataset.slideIndex = String(index);
+      onDisplay?.();
     } catch (error) {
       if (requestGeneration !== generation || error.name === 'AbortError') return;
       if (Date.now() - lastErrorAt > 8000) {

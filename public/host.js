@@ -1,5 +1,6 @@
 import { createSync, takeToken, connectionLabel, setupFullscreen } from './sync.js';
 import { createSlides } from './slides.js';
+import { createAnnotations } from './annotations.js';
 
 const element = (id) => document.getElementById(id);
 const token = takeToken('host');
@@ -8,12 +9,70 @@ let state;
 let links = [];
 let changing = false;
 let uploading = false;
+let drawingEnabled = false;
+let drawingTimer;
+let drawingSending = false;
+const pendingStrokes = new Map();
 function showError(message) { element('error').textContent = message; element('error').hidden = false; }
-const slides = createSlides({ image: element('slide-image'), empty: element('empty'), headers, onError: showError });
+const annotations = createAnnotations({
+  canvas: element('annotations'), image: element('slide-image'), onError: showError,
+  settings: () => ({ tool: element('draw-tool').value, size: Number(element('draw-size').value),
+    color: element('draw-color').value, lifetime: Number(element('draw-lifetime').value) }),
+  onStroke(stroke, finished) {
+    const pending = pendingStrokes.get(stroke.id) ?? { stroke, sent: 0, finished: false };
+    pending.finished ||= finished;
+    pendingStrokes.set(stroke.id, pending);
+    scheduleDrawing();
+  },
+});
+const slides = createSlides({ image: element('slide-image'), empty: element('empty'), headers,
+  onError: showError, onDisplay: annotations.refresh });
+
+function currentStroke(stroke) {
+  return state?.deck?.id === stroke.deckId && state.slide === stroke.index && state.annotations?.epoch === stroke.epoch;
+}
+
+function scheduleDrawing() {
+  if (!drawingTimer && !drawingSending) drawingTimer = setTimeout(() => { drawingTimer = null; void flushDrawing(); }, 80);
+}
+
+async function flushDrawing() {
+  if (drawingSending) return;
+  const pending = [...pendingStrokes.values()].find((entry) => entry.sent < entry.stroke.points.length || entry.finished);
+  if (!pending) return;
+  const { stroke } = pending;
+  if (!currentStroke(stroke)) { pendingStrokes.delete(stroke.id); scheduleDrawing(); return; }
+  const points = stroke.points.slice(pending.sent, pending.sent + 32);
+  const finished = pending.finished && pending.sent + points.length === stroke.points.length;
+  drawingSending = true;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+  try {
+    const nextState = await api('/api/host/annotations', { method: 'POST', signal: controller.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deckId: stroke.deckId, index: stroke.index, epoch: stroke.epoch,
+        action: 'append', id: stroke.id, tool: stroke.tool, size: stroke.size, color: stroke.color,
+        lifetime: stroke.lifetime, points, finished }) });
+    pending.sent += points.length;
+    if (finished) pendingStrokes.delete(stroke.id);
+    update(nextState);
+  } catch (error) {
+    pendingStrokes.delete(stroke.id);
+    if (currentStroke(stroke)) annotations.reject(stroke.id, error.name === 'AbortError'
+      ? 'Не вдалося передати малюнок. Перевірте з’єднання.' : error.message);
+  } finally {
+    clearTimeout(timeout);
+    drawingSending = false;
+    if (pendingStrokes.size) scheduleDrawing();
+  }
+}
 
 function update(nextState) {
   if (state?.sessionId === nextState.sessionId && nextState.revision < state.revision) return;
+  if (state?.deck?.id !== nextState.deck?.id || state?.slide !== nextState.slide
+    || state?.annotations?.epoch !== nextState.annotations?.epoch) pendingStrokes.clear();
   state = nextState;
+  annotations.update(state);
   slides.update(state);
   const count = state.deck?.pages.length ?? 0;
   element('page-total').textContent = `/ ${count}`;
@@ -29,6 +88,9 @@ function update(nextState) {
     ? `Готуємо слайди: ${state.processing.done} / ${state.processing.total ?? '…'}. Поточна презентація залишається доступною.`
     : uploading ? 'Передаємо PDF на локальний сервер…' : state.deck ? 'Презентація готова. Учасники завантажують слайди автоматично.' : '';
   element('upload').disabled = uploading || Boolean(state.processing);
+  for (const id of ['draw-toggle', 'draw-tool', 'draw-size', 'draw-color', 'draw-lifetime', 'draw-clear']) {
+    element(id).disabled = !count;
+  }
 }
 
 const sync = createSync({ role: 'host', token, onState: update,
@@ -93,7 +155,20 @@ element('upload-form').addEventListener('submit', async (event) => {
   catch (error) { showError(error.message); }
   finally { uploading = false; if (state) update(state); }
 });
-setupFullscreen(element('fullscreen'), element('stage'), showError);
+element('draw-toggle').addEventListener('click', () => {
+  drawingEnabled = !drawingEnabled;
+  element('draw-toggle').setAttribute('aria-pressed', String(drawingEnabled));
+  annotations.setEnabled(drawingEnabled);
+});
+element('draw-clear').addEventListener('click', async () => {
+  if (!state?.deck) return;
+  pendingStrokes.clear();
+  try {
+    update(await api('/api/host/annotations', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'clear', deckId: state.deck.id, index: state.slide, epoch: state.annotations.epoch }) }));
+  } catch (error) { showError(error.message); }
+});
+setupFullscreen(element('fullscreen'), element('presentation-screen'), showError);
 if (!token) showError('Відкрийте повне посилання ведучого з термінала на цьому ноутбуці.');
 else {
   await sync.start();

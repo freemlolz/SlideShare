@@ -9,6 +9,7 @@ import express from 'express';
 import multer from 'multer';
 import QRCode from 'qrcode';
 import { WebSocketServer, WebSocket } from 'ws';
+import { AnnotationLayer } from './annotations.mjs';
 
 const publicRoot = fileURLToPath(new URL('../public/', import.meta.url));
 export const LIMITS = { pdfBytes: 40 * 1024 * 1024, pages: 150, imageBytes: 48 * 1024 * 1024, renderMs: 120_000 };
@@ -57,11 +58,13 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
   let activeWorker = null;
   let activeUpload = null;
   let actualPort;
+  const annotations = new AnnotationLayer(broadcast);
 
   function snapshot() {
     const viewers = [...sockets.clients].filter((client) => client.role === 'viewer' && client.readyState === WebSocket.OPEN);
     return {
       type: 'state', sessionId, revision, slide, deck, processing,
+      serverTime: Date.now(), annotations: annotations.snapshot(),
       participants: viewers.length,
       ready: viewers.filter((client) => deck && client.deckId === deck.id && client.loaded === deck.pages.length).length,
     };
@@ -198,6 +201,7 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
           const fileName = Buffer.from(request.file.originalname, 'latin1').toString('utf8');
           deck = { id, name: fileName, pages: result.pages, totalBytes: result.totalBytes };
           slide = 0;
+          annotations.reset();
           for (const client of sockets.clients) { client.loaded = 0; client.deckId = null; }
           processing = null;
           broadcast();
@@ -227,7 +231,17 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
     if (!deck || request.body?.deckId !== deck.id) return response.status(409).json({ error: 'Презентація змінилася. Повторіть дію.' });
     const index = request.body.index;
     if (!Number.isInteger(index) || index < 0 || index >= deck.pages.length) return response.status(400).json({ error: 'Некоректний номер слайда.' });
+    if (slide !== index) annotations.reset();
     slide = index;
+    broadcast();
+    response.json(snapshot());
+  });
+
+  app.post('/api/host/annotations', authorizeHost, (request, response) => {
+    if (!deck || request.body?.deckId !== deck.id || request.body.index !== slide) {
+      return response.status(409).json({ error: 'Слайд змінився. Малюйте на поточному слайді.' });
+    }
+    annotations.apply(request.body);
     broadcast();
     response.json(snapshot());
   });
@@ -311,6 +325,7 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
       if (closing) return;
       closing = true;
       clearInterval(heartbeat);
+      annotations.close();
       if (activeWorker) await activeWorker.terminate();
       for (const client of sockets.clients) client.terminate();
       sockets.close();

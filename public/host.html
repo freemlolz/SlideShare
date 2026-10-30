@@ -12,9 +12,20 @@
   <main class="host-layout">
     <section class="presentation">
       <div class="section-heading"><div><p class="eyebrow">ПУЛЬТ ВЕДУЧОГО</p><h1>Ваші слайди. На кожному екрані.</h1></div><span id="connection" class="status" role="status">Підключення…</span></div>
+      <div class="presentation-screen" id="presentation-screen">
       <div class="stage" id="stage">
         <img id="slide-image" alt="Поточний слайд" hidden>
+        <canvas id="annotations" class="annotations" aria-label="Малювання на слайді"></canvas>
         <div id="empty" class="empty"><span class="empty-icon">▤</span><h2>Почніть із презентації</h2><p>Завантажте PDF. Учасники побачать слайди<br>у браузері свого телефона.</p></div>
+      </div>
+      <div class="drawing-toolbar" role="group" aria-label="Інструменти малювання">
+        <button id="draw-toggle" type="button" aria-pressed="false" disabled>Малювати</button>
+        <label>Інструмент<select id="draw-tool" disabled><option value="pencil">Олівець</option><option value="brush">Пензлик</option><option value="marker">Маркер</option></select></label>
+        <label>Розмір<select id="draw-size" disabled><option value="3">Тонкий</option><option value="6" selected>Середній</option><option value="12">Товстий</option><option value="20">Дуже товстий</option></select></label>
+        <label>Колір<input id="draw-color" type="color" value="#ef4444" disabled></label>
+        <label>Зберігати<select id="draw-lifetime" disabled><option value="5000">5 секунд</option><option value="0">До очищення</option></select></label>
+        <button id="draw-clear" type="button" disabled>Очистити</button>
+      </div>
       </div>
       <div class="slide-controls"><button id="previous" class="square" aria-label="Попередній слайд" disabled>←</button><label class="page-picker">Слайд <input id="slide-number" type="number" min="1" value="1" aria-label="Номер слайда" disabled> <span id="page-total">/ 0</span></label><button id="next" class="square" aria-label="Наступний слайд" disabled>→</button><button id="fullscreen" class="subtle">На весь екран</button></div>
       <div class="deck-info"><span id="deck-name">PDF ще не завантажено</span><span class="muted">← → або пробіл для перемикання</span></div>
