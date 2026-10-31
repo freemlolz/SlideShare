@@ -19,9 +19,27 @@ export function createSync({ role, token, onState, onConnection, onError, onOpen
   let lastRevision = -1;
   let sessionId;
   let polling = false;
+  let pendingReady;
+  let latestReady;
+  let reportingReady = false;
 
   const headers = role === 'host' ? { 'X-Host-Token': token } : {};
   const stateUrl = role === 'host' ? '/api/state' : `/api/state?token=${encodeURIComponent(token)}`;
+
+  async function flushReady() {
+    if (reportingReady || !pendingReady || stopped || document.hidden || socket?.readyState === WebSocket.OPEN) return;
+    const report = pendingReady;
+    pendingReady = null;
+    reportingReady = true;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    try {
+      const response = await fetch(`/api/ready?token=${encodeURIComponent(token)}`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(report), signal: controller.signal });
+      if (!response.ok && response.status !== 409) throw new Error();
+    } catch { pendingReady ??= report; }
+    finally { clearTimeout(timeout); reportingReady = false; }
+  }
 
   function accept(state) {
     if (sessionId && sessionId !== state.sessionId) lastRevision = -1;
@@ -83,6 +101,8 @@ export function createSync({ role, token, onState, onConnection, onError, onOpen
       if (socket !== current) return;
       socket = null;
       if (stopped) return;
+      pendingReady ??= latestReady;
+      void flushReady();
       onConnection('offline');
       reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, retry + Math.random() * 250);
       retry = Math.min(retry * 2, 10_000);
@@ -96,7 +116,9 @@ export function createSync({ role, token, onState, onConnection, onError, onOpen
     socket?.close();
     socket = null;
     await refresh();
+    pendingReady ??= latestReady;
     connect();
+    void flushReady();
   }
 
   function stop() {
@@ -114,6 +136,7 @@ export function createSync({ role, token, onState, onConnection, onError, onOpen
     if (socket?.readyState !== WebSocket.OPEN || Date.now() - lastMessage > 15_000) void refresh();
     if (socket?.readyState === WebSocket.OPEN && Date.now() - lastMessage > 22_000) socket.close();
     connect();
+    void flushReady();
   }, 3000);
   document.addEventListener('visibilitychange', resume);
   window.addEventListener('pageshow', resume);
@@ -123,7 +146,16 @@ export function createSync({ role, token, onState, onConnection, onError, onOpen
     async start() { await refresh(); connect(); },
     refresh,
     stop,
-    send(message) { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); },
+    send(message) {
+      if (message.type === 'ready') latestReady = message;
+      if (socket?.readyState === WebSocket.OPEN) {
+        if (message.type === 'ready') pendingReady = null;
+        socket.send(JSON.stringify(message));
+      } else if (role === 'viewer' && message.type === 'ready') {
+        pendingReady = message;
+        void flushReady();
+      }
+    },
   };
 }
 

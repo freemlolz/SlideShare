@@ -6,6 +6,7 @@
   <title>SlideSync Local — ведучий</title>
   <link rel="stylesheet" href="/assets/style.css">
   <link rel="stylesheet" href="/assets/polls.css">
+  <link rel="stylesheet" href="/assets/presence.css">
   <script type="module" src="/assets/host.js"></script>
 </head>
 <body>
@@ -39,7 +40,8 @@
     </section>
     <aside class="sidebar">
       <section class="card join-card"><p class="eyebrow">ЗАПРОСІТЬ УЧАСНИКІВ</p><h2>Один QR. Усі разом.</h2><p class="muted">Та сама Wi-Fi-мережа. Жодних застосунків.</p><div class="qr-wrap"><img id="qr" alt="QR-код для приєднання" hidden></div><label class="small" for="network">Адреса ноутбука</label><select id="network" aria-label="Мережевий інтерфейс"></select><a id="join-url" class="join-url" target="_blank" rel="noreferrer"></a><button id="copy" class="secondary">Скопіювати посилання</button><p id="copy-status" class="small" role="status"></p></section>
-      <section class="card"><div class="metrics"><div><strong id="participants">0</strong><span>підключено</span></div><div><strong id="ready">0</strong><span>усі слайди готові</span></div></div><p class="small muted">Готовність означає, що телефон завантажив усі слайди. Перед початком дочекайтеся учасників.</p></section>
+      <section class="card"><div class="metrics"><div><strong id="participants">0</strong><span>WS-вкладок</span></div><div><strong id="ready">0</strong><span>готових WS-вкладок</span></div></div><p class="small muted">Готовність означає, що вкладка завантажила всі слайди. Нижче враховані також учасники з HTTP-резервом.</p></section>
+      <section id="presence-panel" class="card" aria-label="Стан підключення учасників"></section>
       <details class="card help"><summary>Телефон не підключається?</summary><ol><li>Оберіть адресу Wi-Fi, якщо є VPN або кілька мереж.</li><li>Відкрийте QR у звичайному Safari або Chrome.</li><li>Дозвольте вхідні з’єднання для Node.js у брандмауері ноутбука.</li><li>Гостьова мережа може блокувати зв’язок між пристроями.</li></ol><p>Ноутбук має залишатися увімкненим. Bluetooth не використовується.</p></details>
     </aside>
   </main>

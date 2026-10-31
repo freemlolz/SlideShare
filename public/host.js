@@ -4,6 +4,7 @@ import { createAnnotations } from './annotations.js';
 import { createPollLibrary, createPollScreen } from './polls.js';
 import { createPollLauncher } from './poll-launcher.js';
 import { readApiResponse } from './api.js';
+import { createPresencePanel } from './presence.js';
 
 const element = (id) => document.getElementById(id);
 const token = takeToken('host');
@@ -18,6 +19,10 @@ let drawingSending = false;
 let launchingPoll = false;
 const pendingStrokes = new Map();
 function showError(message) { element('error').textContent = message; element('error').hidden = false; }
+const presencePanel = createPresencePanel({ root: element('presence-panel'), onError: showError,
+  async onRemove(id) {
+    update(await api('/api/host/presence/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }));
+  } });
 const annotations = createAnnotations({
   canvas: element('annotations'), image: element('slide-image'), onError: showError,
   settings: () => ({ tool: element('draw-tool').value, size: Number(element('draw-size').value),
@@ -100,6 +105,7 @@ function update(nextState) {
   if (state?.deck?.id !== nextState.deck?.id || state?.slide !== nextState.slide
     || state?.annotations?.epoch !== nextState.annotations?.epoch) pendingStrokes.clear();
   state = nextState;
+  presencePanel.update(state);
   pollScreen.update(state);
   pollLibrary.update(state);
   pollLauncher.update(state);

@@ -33,6 +33,7 @@ Keep the laptop awake and the server running. Use `npm run demo` to generate a s
 - **Clean transitions:** changing slides clears all ink. Manual clear uses a short fade.
 - **Personal browsing:** revisit earlier slides on your phone, then return to the presenter's current slide.
 - **Local rendering:** PDF pages become JPEGs on the laptop and preload on phones.
+- **Connection health:** presenter-only browser profiles, reconnect/disconnect status, HTTP fallback, and preload progress. No device fingerprinting.
 - **Quick polls:** save 2- or 4-choice questions, then launch from a floating presenter-only widget, including fullscreen. Vote for 10 seconds; results appear on every screen automatically.
 
 <table>

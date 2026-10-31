@@ -11,6 +11,7 @@ import QRCode from 'qrcode';
 import { WebSocketServer, WebSocket } from 'ws';
 import { AnnotationLayer } from './annotations.mjs';
 import { PollSession } from './polls.mjs';
+import { PresenceRegistry } from './presence.mjs';
 
 const publicRoot = fileURLToPath(new URL('../public/', import.meta.url));
 export const LIMITS = { pdfBytes: 40 * 1024 * 1024, pages: 150, imageBytes: 48 * 1024 * 1024, renderMs: 120_000 };
@@ -36,7 +37,7 @@ function errorWithStatus(message, status = 400) {
   return Object.assign(new Error(message), { status });
 }
 
-export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddress, renderMs = LIMITS.renderMs } = {}) {
+export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddress, renderMs = LIMITS.renderMs, presenceNow = Date.now } = {}) {
   const addresses = localAddresses();
   if (lanAddress && !addresses.includes(lanAddress)) {
     throw new Error('LAN_ADDRESS має бути IPv4-адресою активного інтерфейсу цього ноутбука.');
@@ -62,13 +63,16 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
   const annotations = new AnnotationLayer(broadcast);
   const polls = new PollSession(broadcast);
   const voterCookie = `slidesync-voter-${sessionId}`;
+  const presence = new PresenceRegistry({ now: presenceNow });
+  let presenceTimer = null;
 
-  function snapshot(voterId) {
+  function snapshot(voterId, presenter = false) {
     const viewers = [...sockets.clients].filter((client) => client.role === 'viewer' && client.readyState === WebSocket.OPEN);
     return {
       type: 'state', sessionId, revision, slide, deck, processing,
       serverTime: Date.now(), annotations: annotations.snapshot(),
       poll: polls.snapshot(voterId),
+      ...(presenter ? { presence: presence.snapshot(deck) } : {}),
       participants: viewers.length,
       ready: viewers.filter((client) => deck && client.deckId === deck.id && client.loaded === deck.pages.length).length,
     };
@@ -83,7 +87,23 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
   function broadcast() {
     revision += 1;
     const state = snapshot();
-    for (const client of sockets.clients) send(client, { ...state, poll: polls.snapshot(client.voterId) });
+    for (const client of sockets.clients) send(client, { ...state, poll: polls.snapshot(client.voterId),
+      ...(client.role === 'host' ? { presence: presence.snapshot(deck) } : {}) });
+  }
+
+  function schedulePresence() {
+    if (presenceTimer || closing) return;
+    presenceTimer = setTimeout(publishPresence, 250);
+    presenceTimer.unref();
+  }
+
+  function publishPresence() {
+    clearTimeout(presenceTimer);
+    presenceTimer = null;
+    if (closing) return;
+    revision += 1;
+    const state = snapshot(undefined, true);
+    for (const client of sockets.clients) if (client.role === 'host') send(client, state);
   }
 
   function allowedHost(request) {
@@ -150,7 +170,29 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
   });
   app.get('/join', (request, response) => response.sendFile(path.join(publicRoot, 'viewer.html')));
   app.use('/assets', express.static(publicRoot, { index: false, dotfiles: 'deny', maxAge: 0 }));
-  app.get('/api/state', authorizeViewer, (request, response) => response.json(snapshot(request.voterId)));
+  app.get('/api/state', authorizeViewer, (request, response) => {
+    if (request.voterId && voterIdentity(request)) {
+      if (!presence.http(request.voterId)) return response.status(503).json({ error: 'Досягнуто межі 500 учасників. Ведучий може прибрати від’єднані записи.' });
+      schedulePresence();
+    }
+    response.json(snapshot(request.voterId, authorizedHost(request)));
+  });
+  app.post('/api/ready', authorizeViewer, (request, response) => {
+    if (!request.voterId) return response.status(403).json({ error: 'Звіт готовності доступний лише учасникам.' });
+    if (!voterIdentity(request)) return response.status(400).json({ error: 'Для звіту готовності дозвольте cookie.' });
+    const { deckId, loaded } = request.body ?? {};
+    if (!deck || deckId !== deck.id) return response.status(409).json({ error: 'Презентація змінилася.' });
+    if (!Number.isInteger(loaded) || loaded < 0 || loaded > deck.pages.length) return response.status(400).json({ error: 'Некоректна готовність слайдів.' });
+    if (!presence.http(request.voterId)) return response.status(503).json({ error: 'Досягнуто межі учасників.' });
+    presence.ready(request.voterId, { deckId, loaded });
+    schedulePresence();
+    response.json({ ok: true });
+  });
+  app.post('/api/host/presence/remove', authorizeHost, (request, response) => {
+    presence.remove(request.body?.id);
+    publishPresence();
+    response.json(snapshot(undefined, true));
+  });
   app.get('/api/host/config', authorizeHost, async (request, response) => {
     const sorted = lanAddress ? [lanAddress, ...addresses.filter((address) => address !== lanAddress)] : addresses;
     const links = await Promise.all(sorted.map(async (address) => {
@@ -242,7 +284,7 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
           busy = false;
           broadcast();
           if (requestError) next(requestError);
-          else response.json(snapshot());
+          else response.json(snapshot(undefined, true));
           resolveUpload();
         }
       });
@@ -256,7 +298,7 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
     if (slide !== index) annotations.reset();
     slide = index;
     broadcast();
-    response.json(snapshot());
+    response.json(snapshot(undefined, true));
   });
 
   app.post('/api/host/annotations', authorizeHost, (request, response) => {
@@ -265,25 +307,27 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
     }
     annotations.apply(request.body);
     broadcast();
-    response.json(snapshot());
+    response.json(snapshot(undefined, true));
   });
 
   app.post('/api/host/polls/start', authorizeHost, (request, response) => {
     polls.start(request.body);
     broadcast();
-    response.json(snapshot());
+    response.json(snapshot(undefined, true));
   });
 
   app.post('/api/host/polls/cancel', authorizeHost, (request, response) => {
     polls.cancel(request.body?.pollId);
     broadcast();
-    response.json(snapshot());
+    response.json(snapshot(undefined, true));
   });
 
   app.post('/api/polls/vote', authorizeViewer, (request, response) => {
     if (!request.voterId) return response.status(403).json({ error: 'Голосування доступне учасникам через посилання з QR-коду.' });
     if (!voterIdentity(request)) return response.status(400).json({ error: 'Для голосування дозвольте cookie та оновіть сторінку.' });
     polls.vote(request.body, request.voterId);
+    presence.http(request.voterId);
+    schedulePresence();
     broadcast();
     response.json(snapshot(request.voterId));
   });
@@ -325,8 +369,12 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
       client.voterId = voterId;
       client.alive = true;
       client.loaded = 0;
+      if (role === 'viewer' && !presence.connect(voterId, client)) { client.terminate(); return; }
       client.on('error', () => {});
-      client.on('pong', () => { client.alive = true; });
+      client.on('pong', () => {
+        client.alive = true;
+        if (role === 'viewer') { presence.pong(voterId, client); schedulePresence(); }
+      });
       client.on('message', (raw) => {
         try {
           const message = JSON.parse(raw.toString());
@@ -335,12 +383,16 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
             if (client.deckId !== deck.id || client.loaded !== message.loaded) {
               client.deckId = deck.id;
               client.loaded = message.loaded;
+              presence.ready(voterId, { deckId: message.deckId, loaded: message.loaded }, client);
               broadcast();
             }
           }
         } catch { send(client, { type: 'error', error: 'Некоректне повідомлення.' }); }
       });
-      client.on('close', broadcast);
+      client.on('close', () => {
+        if (role === 'viewer') presence.disconnect(voterId, client);
+        if (!closing) broadcast();
+      });
       broadcast();
     });
   });
@@ -350,16 +402,20 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
       if (!client.alive) { client.terminate(); continue; }
       client.alive = false;
       client.ping();
-      send(client, snapshot(client.voterId));
+      send(client, snapshot(client.voterId, client.role === 'host'));
     }
   }, 10_000);
   heartbeat.unref();
+  const presenceSweep = setInterval(() => { if (presence.sweep()) schedulePresence(); }, 2000);
+  presenceSweep.unref();
 
   try {
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); });
     actualPort = server.address().port;
   } catch (error) {
     clearInterval(heartbeat);
+    clearInterval(presenceSweep);
+    clearTimeout(presenceTimer);
     polls.close();
     await rm(storage, { recursive: true, force: true });
     throw error;
@@ -372,6 +428,8 @@ export async function createSlideSync({ port = 3000, host = '0.0.0.0', lanAddres
       if (closing) return;
       closing = true;
       clearInterval(heartbeat);
+      clearInterval(presenceSweep);
+      clearTimeout(presenceTimer);
       annotations.close();
       polls.close();
       if (activeWorker) await activeWorker.terminate();

@@ -1,0 +1,50 @@
+import { test, expect } from '@playwright/test';
+import { createSlideSync } from '../../src/server.mjs';
+import { makePdf } from '../../scripts/create-demo.mjs';
+
+test('presenter sees deduplicated profiles, fallback readiness, disconnection and reconnects', async ({ browser }) => {
+  let now = Date.now();
+  const application = await createSlideSync({ port: 0, host: '127.0.0.1', presenceNow: () => now });
+  const base = `http://127.0.0.1:${application.port}`;
+  const hostContext = await browser.newContext({ viewport: { width: 1440, height: 1050 } });
+  const viewerContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const fallbackContext = await browser.newContext();
+  const host = await hostContext.newPage();
+  const first = await viewerContext.newPage();
+  const second = await viewerContext.newPage();
+  const fallback = await fallbackContext.newPage();
+  const errors = [];
+  for (const page of [host, first, second, fallback]) page.on('pageerror', (error) => errors.push(error.message));
+  try {
+    const body = new FormData();
+    body.append('pdf', new Blob([makePdf(2)]), 'health.pdf');
+    await fetch(`${base}/api/host/pdf`, { method: 'POST', headers: { 'X-Host-Token': application.hostToken }, body });
+    await host.goto(application.hostUrl);
+    const join = `${base}/join#token=${application.viewerToken}`;
+    await first.goto(join);
+    await second.goto(join);
+    await expect(host.locator('.presence-participant')).toHaveCount(1);
+    await expect(host.locator('.presence-participant')).toContainText('2 WS-вкладок');
+    await expect(host.locator('.presence-preload')).toContainText('2 / 2');
+    await expect(first.locator('#presence-panel')).toHaveCount(0);
+    await expect(second.locator('body')).not.toContainText('Стан учасників');
+    await fallback.routeWebSocket('**/ws?*', (socket) => socket.close());
+    await fallback.goto(join);
+    await expect(host.locator('.presence-participant')).toHaveCount(2);
+    await expect(host.locator('.presence-participant[data-status="fallback"] .presence-preload')).toContainText('2 / 2');
+    await fallback.close();
+    await first.close();
+    await second.close();
+    now += 35001;
+    await expect(host.locator('.presence-participant[data-status="disconnected"]')).toHaveCount(2);
+    const rejoined = await viewerContext.newPage();
+    await rejoined.goto(join);
+    await expect(host.locator('.presence-participant')).toHaveCount(2);
+    await expect(host.locator('.presence-participant[data-participant-id="1"]')).toHaveAttribute('data-status', 'connected');
+    await expect(host.locator('.presence-participant[data-participant-id="1"]')).toContainText('Учасник 1');
+    await host.locator('.presence-participant[data-status="disconnected"] .presence-remove').click();
+    await expect(host.locator('.presence-participant')).toHaveCount(1);
+    await host.locator('#presence-panel').screenshot({ path: `test-results/${test.info().project.name}-presence.png` });
+    expect(errors).toEqual([]);
+  } finally { await hostContext.close(); await viewerContext.close(); await fallbackContext.close(); await application.close(); }
+});
