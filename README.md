@@ -4,9 +4,19 @@
 
 # SlideSync Local
 
-Sync PDF slides to phone browsers over Wi-Fi. No installs. No cloud.
+Sync PDF slides to phone browsers over Wi-Fi. No phone installs. No cloud.
 
 **[Quick start](#quick-start)** · **[Features](#features)** · **[Testing](#testing)** · **[Українська інструкція](docs/README.uk.md)**
+
+## macOS desktop beta
+
+The desktop beta bundles its own runtime: install the DMG, open the app, choose a PDF, and scan the QR. No console or separate Node.js required. Saved polls stay on the Mac.
+
+Requires macOS 14+. This beta is not Apple-notarized; macOS may block downloaded copies. Build only for your Mac's native architecture. [Installation, limitations & build guide](docs/MACOS_BETA.md).
+
+## Android presenter beta
+
+Host a PDF presentation directly from an Android 8+ phone. Attendees join in their browsers; no laptop required. First beta: QR, live sync, preloading, reconnect, and slide history. Ink and polls are not included yet. [APK setup, limits & source build guide](android/README.md).
 
 ## Quick start
 
@@ -64,6 +74,7 @@ Chromium and mobile WebKit scenarios cover drawing, fading, history, reconnect, 
 
 ## Documentation
 
+- [macOS desktop beta: installation, builds & limitations](docs/MACOS_BETA.md) — no console or separate Node.js for users.
 - [Full setup & Safari troubleshooting — Ukrainian](docs/README.uk.md)
 - [Architecture](docs/ARCHITECTURE.md) · [Specification](docs/SPECIFICATION.md)
 - [Test guide](docs/TESTING.md) · [Validation record](docs/VALIDATION.md)

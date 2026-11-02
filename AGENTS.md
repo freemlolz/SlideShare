@@ -16,6 +16,9 @@
 - `npm ci` — встановлення зафіксованих залежностей.
 - `npm start` — локальний HTTP/WebSocket-сервер на порту 3000.
 - `npm run demo` — створення демонстраційного PDF.
+- `npm run desktop` — локальне вікно macOS; `npm run desktop:dist -- --x64` або `--arm64` — DMG лише для нативної архітектури Mac. Збірки у `dist/` не додаються в Git і не публікуються автоматично.
+- `npm run test:desktop` — ізольована desktop-перевірка; не використовуйте особистий профіль для тестів. Інструкція бети: `docs/MACOS_BETA.md`.
+- Android-пульт розташований у `android/`; `npm run android:beta` створює APK у `dist/android`. Ключ і пароль у `android/.signing/` приватні: ніколи не додавайте їх у Git, не замінюйте наявний ключ мовчки. Інструкція: `android/README.md`.
 - `npm test` — серверні інтеграційні тести, включно з короткою перевіркою через LAN-інтерфейс.
 - `npx playwright install chromium webkit`, потім `npm run test:browser` — браузерні тести.
 - Архітектура та технічне завдання розташовані в `docs/`.

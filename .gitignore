@@ -7,3 +7,12 @@ demo.pdf
 .env.*
 !.env.example
 *.log
+dist/
+desktop/generated/
+android/.gradle/
+android/.kotlin/
+android/local.properties
+android/.signing/
+android/**/build/
+*.jks
+*.keystore

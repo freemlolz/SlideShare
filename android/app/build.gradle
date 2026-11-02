@@ -1,0 +1,58 @@
+plugins { id 'com.android.application' }
+
+def betaProperties = new Properties()
+def betaFile = rootProject.file('.signing/beta.properties')
+if (betaFile.exists()) betaFile.withInputStream { betaProperties.load(it) }
+
+android {
+    namespace = 'io.github.freemlolz.slidesync'
+    compileSdk = 37
+    buildToolsVersion = '36.0.0'
+    defaultConfig {
+        applicationId = 'io.github.freemlolz.slidesync'
+        minSdk = 26
+        targetSdk = 37
+        versionCode = 1
+        versionName = '0.1.0-beta.1'
+        testInstrumentationRunner = 'androidx.test.runner.AndroidJUnitRunner'
+    }
+    signingConfigs {
+        beta {
+            if (betaFile.exists()) {
+                storeFile = rootProject.file('.signing/beta-release.jks')
+                storePassword = betaProperties.getProperty('storePassword')
+                keyAlias = 'slidesync-beta'
+                keyPassword = betaProperties.getProperty('storePassword')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.beta
+            minifyEnabled = false
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    sourceSets.main.assets.srcDir(layout.buildDirectory.dir('generated/viewerAssets').get().asFile)
+}
+
+def viewerAssets = tasks.register('syncViewerAssets', Sync) {
+    from('../../public') {
+        include 'viewer.html', 'viewer.js', 'sync.js', 'slides.js', 'annotations.js', 'polls.js', 'polls.css', 'style.css', 'api.js'
+    }
+    into(layout.buildDirectory.dir('generated/viewerAssets/web'))
+}
+tasks.named('preBuild').configure { dependsOn(viewerAssets) }
+
+dependencies {
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
+    implementation 'org.java-websocket:Java-WebSocket:1.6.0'
+    implementation 'org.slf4j:slf4j-nop:2.0.20'
+    implementation 'com.google.zxing:core:3.5.4'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test:runner:1.7.0'
+    androidTestImplementation 'androidx.test.ext:junit:1.3.0'
+}

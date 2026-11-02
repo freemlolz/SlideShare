@@ -1,0 +1,30 @@
+{
+  "appId": "io.github.freemlolz.slidesync-local",
+  "productName": "SlideSync Local",
+  "directories": { "output": "dist" },
+  "artifactName": "SlideSync-Local-${version}-${arch}.${ext}",
+  "asar": false,
+  "npmRebuild": false,
+  "beforePack": "desktop/before-pack.cjs",
+  "files": ["desktop/*.mjs", "desktop/preload.cjs", "src/**", "public/**", "package.json"],
+  "mac": {
+    "target": ["dmg"],
+    "category": "public.app-category.productivity",
+    "icon": "desktop/generated/icon.png",
+    "minimumSystemVersion": "14.0",
+    "identity": "-",
+    "hardenedRuntime": false,
+    "notarize": false,
+    "extendInfo": {
+      "NSLocalNetworkUsageDescription": "SlideSync Local передає слайди та опитування телефонам у вашій Wi-Fi-мережі."
+    }
+  },
+  "dmg": {
+    "title": "SlideSync Local Beta",
+    "contents": [
+      { "x": 140, "y": 180, "type": "file" },
+      { "x": 420, "y": 180, "type": "link", "path": "/Applications" }
+    ]
+  },
+  "publish": null
+}

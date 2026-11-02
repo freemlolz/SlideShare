@@ -18,6 +18,7 @@ export function createSync({ role, token, onState, onConnection, onError, onOpen
   let lastMessage = 0;
   let lastRevision = -1;
   let sessionId;
+  let websocketPort;
   let polling = false;
   let pendingReady;
   let latestReady;
@@ -42,6 +43,7 @@ export function createSync({ role, token, onState, onConnection, onError, onOpen
   }
 
   function accept(state) {
+    websocketPort = Number.isInteger(state.websocketPort) && state.websocketPort > 0 && state.websocketPort <= 65535 ? state.websocketPort : undefined;
     if (sessionId && sessionId !== state.sessionId) lastRevision = -1;
     sessionId = state.sessionId;
     if (state.revision < lastRevision) return;
@@ -78,7 +80,8 @@ export function createSync({ role, token, onState, onConnection, onError, onOpen
   function connect() {
     if (stopped || document.hidden || reconnectTimer || socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return;
     onConnection('connecting');
-    socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws?role=${role}&token=${encodeURIComponent(token)}`);
+    const socketHost = websocketPort ? `${location.hostname}:${websocketPort}` : location.host;
+    socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${socketHost}/ws?role=${role}&token=${encodeURIComponent(token)}`);
     const current = socket;
     const timeout = setTimeout(() => current.close(), 7000);
     current.onopen = () => {

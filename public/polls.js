@@ -114,9 +114,10 @@ export function createPollScreen({ root, role, onVote, onDismiss, onError }) {
 
 export function createPollLibrary({ root, onStart, onChange }) {
   const storageKey = 'slidesync-polls-v1';
+  const desktop = window.slideSyncDesktop;
   root.innerHTML = `<div class="poll-library-heading"><div><p class="eyebrow">ЗАПИТАЙТЕ АУДИТОРІЮ</p><h2>Швидкі опитування</h2></div><button type="button" id="poll-new">+ Створити</button></div>
     <p class="small muted">2 або 4 відповіді · 10 секунд · результати на всіх екранах</p>
-    <p class="small muted">Збережені питання залишаються в цьому браузері ноутбука. Після перезапуску сервера голоси не зберігаються.</p>
+    <p class="small muted">${desktop ? 'Збережені питання залишаються в застосунку на цьому Mac.' : 'Збережені питання залишаються в цьому браузері ноутбука.'} Після перезапуску сервера голоси не зберігаються.</p>
     <p id="poll-library-message" class="small" role="status"></p><div id="poll-list" class="poll-list"></div>
     <form id="poll-form" class="poll-editor" hidden><h3 id="poll-editor-title">Нове опитування</h3>
       <label for="poll-question">Запитання</label><textarea id="poll-question" maxlength="200" rows="2" required placeholder="Що обговоримо далі?"></textarea>
@@ -145,7 +146,7 @@ export function createPollLibrary({ root, onStart, onChange }) {
     fields.append(label);
   }
   try {
-    const saved = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
+    const saved = JSON.parse((desktop ? desktop.readPolls() : localStorage.getItem(storageKey)) ?? '[]');
     if (!Array.isArray(saved) || saved.length > 50 || saved.some((poll) => !poll || typeof poll.id !== 'string'
       || typeof poll.question !== 'string' || !poll.question.trim() || poll.question.length > 200
       || !Array.isArray(poll.options) || ![2, 4].includes(poll.options.length)
@@ -154,8 +155,14 @@ export function createPollLibrary({ root, onStart, onChange }) {
   } catch { message.textContent = 'Не вдалося прочитати збережені опитування. Можна створити нові.'; }
 
   function persist() {
-    try { localStorage.setItem(storageKey, JSON.stringify(bank)); message.textContent = 'Опитування збережено в цьому браузері.'; }
-    catch { message.textContent = 'Сховище браузера недоступне. Опитування збережено лише до закриття цієї вкладки.'; }
+    if (desktop) {
+      message.textContent = 'Зберігаємо опитування…';
+      void desktop.writePolls(JSON.stringify(bank)).then(() => { message.textContent = 'Опитування збережено на цьому Mac.'; })
+        .catch(() => { message.textContent = 'Не вдалося зберегти на диск. Опитування доступні лише до закриття застосунку.'; });
+    } else {
+      try { localStorage.setItem(storageKey, JSON.stringify(bank)); message.textContent = 'Опитування збережено в цьому браузері.'; }
+      catch { message.textContent = 'Сховище браузера недоступне. Опитування збережено лише до закриття цієї вкладки.'; }
+    }
     renderList();
   }
 
