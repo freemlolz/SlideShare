@@ -1,0 +1,61 @@
+name: Windows desktop beta
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js x64
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.4'
+          architecture: x64
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install browser for desktop checks
+        run: npx playwright install chromium
+      - name: Test server and packaging guards
+        run: npm test
+      - name: Test development app with isolated profile
+        run: npm run test:desktop
+      - name: Build offline installer
+        run: npm run desktop:dist:win
+      - name: Install and test with isolated profile
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem dist/*-windows-x64-setup.exe | Select-Object -First 1
+          $installDir = Join-Path $env:RUNNER_TEMP 'SlideSync Windows Test'
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installDir" -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Installer exited with $($process.ExitCode)" }
+          $env:SLIDESYNC_DESKTOP_EXECUTABLE = Join-Path $installDir 'SlideSync Local.exe'
+          if (!(Test-Path $env:SLIDESYNC_DESKTOP_EXECUTABLE)) { throw 'Installed executable missing' }
+          npm run test:desktop
+          if ($LASTEXITCODE -ne 0) { throw 'Installed desktop check failed' }
+      - name: Prepare checksums and guide
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem dist/*-windows-x64-setup.exe | Select-Object -First 1
+          $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($installer.Name)" | Set-Content dist/SHA256SUMS -Encoding ascii
+          Copy-Item docs/WINDOWS_BETA.md dist/WINDOWS_BETA.md
+      - name: Upload tested installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: SlideSync-Local-Windows-x64-beta
+          path: |
+            dist/*-windows-x64-setup.exe
+            dist/SHA256SUMS
+            dist/WINDOWS_BETA.md
+          if-no-files-found: error
+          retention-days: 14

@@ -62,7 +62,7 @@ test('desktop starts, renders PDF, syncs phones, persists polls across origins, 
     await page.locator('#poll-option-0').fill('Yes');
     await page.locator('#poll-option-1').fill('No');
     await page.locator('#poll-save').click();
-    await page.getByText('Опитування збережено на цьому Mac.', { exact: true }).waitFor();
+    await page.getByText('Опитування збережено на цьому комп’ютері.', { exact: true }).waitFor();
     const persisted = JSON.parse(await readFile(path.join(directory, 'desktop-state.json'), 'utf8'));
     assert.equal(persisted.polls[0].question, 'Desktop beta?');
     await page.screenshot({ path: path.join(root, 'test-results/desktop-beta.png'), fullPage: true });

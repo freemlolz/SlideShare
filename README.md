@@ -14,6 +14,10 @@ The desktop beta bundles its own runtime: install the DMG, open the app, choose 
 
 Requires macOS 14+. This beta is not Apple-notarized; macOS may block downloaded copies. Build only for your Mac's native architecture. [Installation, limitations & build guide](docs/MACOS_BETA.md).
 
+## Windows desktop beta
+
+The same Electron app now has a Windows 10/11 x64 installer target, including ink, polls, and connection health. Build on Windows with `npm run desktop:dist:win`, or use the manual Windows workflow. The unsigned installer bundles its runtime. Windows build and execution still need verification. [Installation & build guide](docs/WINDOWS_BETA.md).
+
 ## Android presenter beta
 
 Host a PDF presentation directly from an Android 8+ phone. Attendees join in their browsers; no laptop required. First beta: QR, live sync, preloading, reconnect, and slide history. Ink and polls are not included yet. [APK setup, limits & source build guide](android/README.md).
@@ -75,6 +79,7 @@ Chromium and mobile WebKit scenarios cover drawing, fading, history, reconnect, 
 ## Documentation
 
 - [macOS desktop beta: installation, builds & limitations](docs/MACOS_BETA.md) — no console or separate Node.js for users.
+- [Windows desktop beta: installer, builds & limitations](docs/WINDOWS_BETA.md)
 - [Full setup & Safari troubleshooting — Ukrainian](docs/README.uk.md)
 - [Architecture](docs/ARCHITECTURE.md) · [Specification](docs/SPECIFICATION.md)
 - [Test guide](docs/TESTING.md) · [Validation record](docs/VALIDATION.md)

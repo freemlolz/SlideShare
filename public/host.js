@@ -9,7 +9,7 @@ import { createPresencePanel } from './presence.js';
 const element = (id) => document.getElementById(id);
 if (window.slideSyncDesktop) {
   element('desktop-status').hidden = false;
-  element('desktop-status').textContent = 'macOS Beta · Сервер працює автоматично. Залишайте застосунок відкритим і не закривайте кришку Mac.';
+  element('desktop-status').textContent = 'Desktop Beta · Сервер працює автоматично. Залишайте застосунок відкритим і не закривайте кришку ноутбука.';
 }
 const token = takeToken('host');
 const headers = { 'X-Host-Token': token };

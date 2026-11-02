@@ -6,6 +6,8 @@ import { createDesktopStore } from './store.mjs';
 import { isJoinUrl, isPresenterUrl, startDesktopServer } from './runtime.mjs';
 
 app.setName('SlideSync Local');
+const platformName = process.platform === 'win32' ? 'Windows' : 'macOS';
+if (process.platform === 'win32') app.setAppUserModelId('io.github.freemlolz.slidesync-local');
 if (app.commandLine.hasSwitch('user-data-dir')) app.setPath('userData', app.commandLine.getSwitchValue('user-data-dir'));
 let window;
 let application;
@@ -58,7 +60,7 @@ if (!app.requestSingleInstanceLock()) {
     const addresses = ['127.0.0.1', ...localAddresses()];
     window = new BrowserWindow({
       width: 1280, height: 860, minWidth: 780, minHeight: 600,
-      title: 'SlideSync Local — macOS Beta', backgroundColor: '#f3f6fa', show: false,
+      title: `SlideSync Local — ${platformName} Beta`, backgroundColor: '#f3f6fa', show: false,
       webPreferences: {
         preload: fileURLToPath(new URL('./preload.cjs', import.meta.url)),
         nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true,
@@ -95,10 +97,10 @@ if (!app.requestSingleInstanceLock()) {
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       { label: 'SlideSync Local', submenu: [
         { label: 'Про SlideSync Local', click: () => dialog.showMessageBox(window, {
-          type: 'info', message: `SlideSync Local ${app.getVersion()} · macOS Beta`,
-          detail: 'Без хмари та встановлення на телефонах. Mac і телефони мають бути в одній Wi-Fi-мережі. Застосунок не дає Mac заснути; не закривайте кришку.',
+          type: 'info', message: `SlideSync Local ${app.getVersion()} · ${platformName} Beta`,
+          detail: 'Без хмари та встановлення на телефонах. Комп’ютер і телефони мають бути в одній Wi-Fi-мережі. Застосунок не дає комп’ютеру заснути; не закривайте кришку ноутбука.',
         }) },
-        { type: 'separator' }, { role: 'hide', label: 'Приховати SlideSync Local' },
+        ...(process.platform === 'darwin' ? [{ type: 'separator' }, { role: 'hide', label: 'Приховати SlideSync Local' }] : []),
         { type: 'separator' }, { label: 'Завершити показ', accelerator: 'CmdOrCtrl+Q', click: () => void requestQuit() },
       ] },
       { label: 'Редагування', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' },

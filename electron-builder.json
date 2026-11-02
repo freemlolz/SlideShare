@@ -26,5 +26,24 @@
       { "x": 420, "y": 180, "type": "link", "path": "/Applications" }
     ]
   },
+  "win": {
+    "target": [{ "target": "nsis", "arch": ["x64"] }],
+    "icon": "desktop/generated/icon.png",
+    "artifactName": "SlideSync-Local-${version}-windows-${arch}-setup.${ext}",
+    "requestedExecutionLevel": "asInvoker",
+    "signExecutable": false
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowElevation": false,
+    "allowToChangeInstallationDirectory": true,
+    "installerLanguages": ["uk_UA"],
+    "language": "1058",
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "runAfterFinish": false,
+    "differentialPackage": false
+  },
   "publish": null
 }

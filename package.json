@@ -17,6 +17,8 @@
     "desktop:icon": "node scripts/create-desktop-icon.mjs",
     "desktop:pack": "npm run desktop:icon && electron-builder --config electron-builder.json --mac --dir --publish never",
     "desktop:dist": "npm run desktop:icon && electron-builder --config electron-builder.json --mac dmg --publish never",
+    "desktop:pack:win": "npm run desktop:icon && electron-builder --config electron-builder.json --win --x64 --dir --publish never",
+    "desktop:dist:win": "npm run desktop:icon && electron-builder --config electron-builder.json --win nsis --x64 --publish never",
     "android:beta": "node scripts/build-android-beta.mjs",
     "demo": "node scripts/create-demo.mjs"
   },

@@ -20,7 +20,7 @@ test('desktop polls survive port changes and reopening without storing session t
     assert.deepEqual(JSON.parse(reopened.readPolls()), polls);
     const filename = path.join(directory, 'desktop-state.json');
     assert.deepEqual(Object.keys(JSON.parse(readFileSync(filename, 'utf8'))).sort(), ['polls', 'port', 'version']);
-    assert.equal(statSync(filename).mode & 0o777, 0o600);
+    if (process.platform !== 'win32') assert.equal(statSync(filename).mode & 0o777, 0o600);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
