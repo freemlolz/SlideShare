@@ -16,7 +16,7 @@ Requires macOS 14+. This beta is not Apple-notarized; macOS may block downloaded
 
 ## Windows desktop beta
 
-The same Electron app now has a Windows 10/11 x64 installer target, including ink, polls, and connection health. Build on Windows with `npm run desktop:dist:win`, or use the manual Windows workflow. The unsigned installer bundles its runtime. Windows build and execution still need verification. [Installation & build guide](docs/WINDOWS_BETA.md).
+The same Electron app has a Windows 10/11 x64 installer, including ink, polls, and connection health. The unsigned installer bundles its runtime. Windows CI checks cover installation, PDF sharing, and saved polls; physical-device checks remain. Build with `npm run desktop:dist:win` or the manual Windows workflow. [Installation & build guide](docs/WINDOWS_BETA.md).
 
 ## Android presenter beta
 
