@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { _electron as electron, chromium, expect } from '@playwright/test';
 import { makePdf } from '../../scripts/create-demo.mjs';
 
-const root = fileURLToPath(new URL('../../', import.meta.url));
+const root = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
 const executablePath = process.env.SLIDESYNC_DESKTOP_EXECUTABLE;
 const { ELECTRON_RUN_AS_NODE, ...environment } = process.env;
 const sessionDirectories = async () => (await readdir(tmpdir())).filter((name) => /^slidesync-[a-zA-Z0-9]+$/.test(name));
